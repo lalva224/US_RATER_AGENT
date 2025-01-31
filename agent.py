@@ -3,15 +3,13 @@ import os
 import requests
 from dotenv import load_dotenv
 from openai import OpenAI
-from langchain_pinecone import PineconeVectorStore
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import PyPDFLoader
 from pinecone import Pinecone
 from transformers import AutoModel
 from langchain_community.embeddings import OpenAIEmbeddings
 import json
 import torch
-from lib.utlity import scrape_page
+from PIL import Image
+from lib.utlity import scrape_page,capture_desktop_and_mobile_screenshots
 
 load_dotenv()
 
@@ -28,7 +26,15 @@ def research_evaluation(query):
 
 def evaluate_page(website):
     #pass in screenshot on desktop, mobile, then send scraped page
-    scraped_page = scrape_page(website)
+    # scraped_page = scrape_page(website)
+    mobile_desktop_screenshots = capture_desktop_and_mobile_screenshots(website)
+    desktop_start, desktop_mid = mobile_desktop_screenshots['desktop']
+    mobile_start, mobile_mid = mobile_desktop_screenshots['mobile']
+    desktop_start.show()
+    desktop_mid.show()
+    mobile_start.show()
+    mobile_mid.show()
+
 def page_quality_rating(website):
     #first try with just 1 reasoning layer, plugging in scraped website text and research from google ground api
     #Then try plugging in relevant context from manual, using the first reasoning layer to come up with relevant queries and using those to extract relevant text. That relevant text would then be sent to 2nd reasoning layer alongside research text and website text.
@@ -54,10 +60,7 @@ def page_quality_rating(website):
     )
     return completion.choices[0].message
 
-# print(generate_guideline_relevant_queries('https://www.couponxoo.com/discount-nikon-scopes'))
-
-# print(scrape_page('https://www.couponxoo.com/discount-nikon-scopes'))
-
+evaluate_page('https://huggingface.co/deepseek-ai/Janus-Pro-7B')
 
 
 
