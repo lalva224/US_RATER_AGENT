@@ -11,18 +11,17 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 import time 
+import base64
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image 
 from io import BytesIO
-import undetected_chromedriver as uc
-from google.colab import userdata 
 load_dotenv()
-pinecone = Pinecone(api_key= userdata.get('PINECONE_API_KEY')) 
+pinecone = Pinecone(api_key= os.getenv('PINECONE_API_KEY')) 
 
 
 def scrape_page(website):
     url = f'https://r.jina.ai/{website}'
-    headers = {'Authorization': f"Bearer {userdata.get('JINA_API_KEY')}"} 
+    headers = {'Authorization': f"Bearer {os.getenv('JINA_API_KEY')}"} 
 
     response = requests.get(url, headers=headers)
 
@@ -82,6 +81,7 @@ def capture_desktop(url):
     #creates bytes object 
     screenshot_1 = driver.get_screenshot_as_png()
     #BytesIO creates a virtual memory buffer to store the bytes, from there they are converted to a PIL object.
+    # desktop_start = base64.b64encode(screenshot_1).decode('utf-8')
     desktop_start = Image.open(BytesIO(screenshot_1))
     #scroll halfway for another screenshot
     total_height = driver.execute_script("return document.body.scrollHeight")
@@ -90,6 +90,7 @@ def capture_desktop(url):
     time.sleep(2)  # Allow time for any dynamic content to load
     
     screenshot_2 = driver.get_screenshot_as_png()
+    # desktop_mid = base64.b64encode(screenshot_2).decode('utf-8')
     desktop_mid = Image.open(BytesIO(screenshot_2))
     driver.quit()
 
@@ -118,6 +119,9 @@ def capture_mobile(url):
                 lambda d: d.execute_script("return document.readyState") == "complete"
             )
     screenshot_1 = driver.get_screenshot_as_png()
+    #convert to  base 64 string
+    # mobile_start =base64.b64encode(screenshot_1).decode('utf-8')
+
     mobile_start = Image.open(BytesIO(screenshot_1))
     #scroll halfway for another screenshot
     total_height = driver.execute_script("return document.body.scrollHeight")
@@ -126,6 +130,7 @@ def capture_mobile(url):
     time.sleep(2)  # Allow time for any dynamic content to load
 
     screenshot_2 = driver.get_screenshot_as_png()
+    # mobile_end = base64.b64encode(screenshot_2).decode('utf-8')
     mobile_end = Image.open(BytesIO(screenshot_2))
     driver.quit()
 
@@ -147,6 +152,13 @@ def capture_desktop_and_mobile_screenshots(url):
         'desktop':desktop_images,
         'mobile': mobile_images
     }
+
+def get_screenshots(url):
+    mobile_desktop_screenshots = capture_desktop_and_mobile_screenshots(url)
+    desktop_start, desktop_mid = mobile_desktop_screenshots['desktop']
+    mobile_start, mobile_mid = mobile_desktop_screenshots['mobile']
+    encoded_images = [desktop_start,desktop_mid,mobile_start,mobile_mid]
+    return encoded_images
 
 
 

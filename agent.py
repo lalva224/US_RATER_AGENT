@@ -10,17 +10,15 @@ import json
 import torch
 from PIL import Image
 from lib.utlity import scrape_page,capture_desktop_and_mobile_screenshots
-from transformers import AutoProcessor, AutoModelForCausalLM
 import torch
-from transformers import AutoModelForCausalLM
-from janus.models import MultiModalityCausalLM, VLChatProcessor
-from janus.utils.io import load_pil_images
-from google.colab import userdata 
+# from google import genai
+
 
 load_dotenv()
 
-genai.configure(api_key=userdata.get('GOOGLE_API_KEY')) # type: ignore
-client = OpenAI(api_key=userdata.get('OPENAI_API_KEY')) # type: ignore
+genai.configure(api_key=os.getenv('GOOGLE_API_KEY')) # type: ignore
+# genai_client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
+openai_client= OpenAI(api_key=os.getenv('OPENAI_API_KEY')) # type: ignore
 
 
 def research_evaluation(query):
@@ -37,51 +35,13 @@ def evaluate_page(website):
     desktop_start, desktop_mid = mobile_desktop_screenshots['desktop']
     mobile_start, mobile_mid = mobile_desktop_screenshots['mobile']
 
-    images = [desktop_start,desktop_mid,mobile_start,mobile_mid]
-    question = 'Evaluate these website screenshots and describe the user experience, design quality, and content organization. For the mobile screenshots note if the scaling or designing is off.'
+    prompt = 'Evaluate these website screenshots and describe the user experience, design quality, and content organization. For the mobile screenshots note if the scaling or designing is off. ignore any cookie banners. '
+    model = genai.GenerativeModel(model_name="gemini-1.5-pro")
 
-    # specify the path to the model
-    model_path = "deepseek-ai/Janus-Pro-7B"
-    vl_chat_processor: VLChatProcessor = VLChatProcessor.from_pretrained(model_path)
-    tokenizer = vl_chat_processor.tokenizer
-
-    vl_gpt: MultiModalityCausalLM = AutoModelForCausalLM.from_pretrained(
-        model_path, trust_remote_code=True
-    )
-    vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()
-
-    conversation = [
-        {
-            "role": "<|User|>",
-            "content": f"<image_placeholder>\n{question}",
-            "images": images,
-        },
-        {"role": "<|Assistant|>", "content": ""},
-    ]
-
-    # load images and prepare for inputs
-    pil_images = load_pil_images(conversation)
-    prepare_inputs = vl_chat_processor(
-        conversations=conversation, images=pil_images, force_batchify=True
-    ).to(vl_gpt.device)
-
-    # # run image encoder to get the image embeddings
-    inputs_embeds = vl_gpt.prepare_inputs_embeds(**prepare_inputs)
-
-    # # run the model to get the response
-    outputs = vl_gpt.language_model.generate(
-        inputs_embeds=inputs_embeds,
-        attention_mask=prepare_inputs.attention_mask,
-        pad_token_id=tokenizer.eos_token_id,
-        bos_token_id=tokenizer.bos_token_id,
-        eos_token_id=tokenizer.eos_token_id,
-        max_new_tokens=512,
-        do_sample=False,
-        use_cache=True,
-    )
-
-    answer = tokenizer.decode(outputs[0].cpu().tolist(), skip_special_tokens=True)
-    print(f"{prepare_inputs['sft_format'][0]}", answer)
+    response = model.generate_content([desktop_start,desktop_mid,mobile_start,mobile_mid,prompt])
+   
+    return response
+  
 
 def page_quality_rating(website):
     #first try with just 1 reasoning layer, plugging in scraped website text and research from google ground api
@@ -99,7 +59,7 @@ def page_quality_rating(website):
             """
     
     #replace with deepseek R1 when available
-    completion = client.chat.completions.create(
+    completion = openai_client.chat.completions.create(
         model="gpt-4o",
         store=True,
         messages=[
@@ -108,7 +68,7 @@ def page_quality_rating(website):
     )
     return completion.choices[0].message
 
-evaluate_page('https://huggingface.co/deepseek-ai/Janus-Pro-7B')
+print(evaluate_page('https://stackoverflow.com/questions/51046454/how-can-we-use-selenium-webdriver-in-colab-research-google-com'))
 
 
     
