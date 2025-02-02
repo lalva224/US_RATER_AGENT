@@ -15,6 +15,7 @@ import torch
 from transformers import AutoModelForCausalLM
 from janus.models import MultiModalityCausalLM, VLChatProcessor
 from janus.utils.io import load_pil_images
+from google.colab import userdata 
 
 load_dotenv()
 

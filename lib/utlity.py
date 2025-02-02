@@ -15,13 +15,14 @@ from concurrent.futures import ThreadPoolExecutor
 from PIL import Image 
 from io import BytesIO
 import undetected_chromedriver as uc
+from google.colab import userdata 
 load_dotenv()
-pinecone = Pinecone(api_key= userdata.get('PINECONE_API_KEY')) # type: ignore
+pinecone = Pinecone(api_key= userdata.get('PINECONE_API_KEY')) 
 
 
 def scrape_page(website):
     url = f'https://r.jina.ai/{website}'
-    headers = {'Authorization': f"Bearer {userdata.get('JINA_API_KEY')}"} # type: ignore
+    headers = {'Authorization': f"Bearer {userdata.get('JINA_API_KEY')}"} 
 
     response = requests.get(url, headers=headers)
 
