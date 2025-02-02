@@ -11,6 +11,7 @@ import torch
 from PIL import Image
 from lib.utlity import scrape_page,capture_desktop_and_mobile_screenshots
 import torch
+import time
 # from google import genai
 
 
@@ -40,35 +41,46 @@ def evaluate_page(website):
 
     response = model.generate_content([desktop_start,desktop_mid,mobile_start,mobile_mid,prompt])
    
-    return response
+    return response.candidates[0].content.parts[0].text
+
   
 
 def page_quality_rating(website):
-    #first try with just 1 reasoning layer, plugging in scraped website text and research from google ground api
-    #Then try plugging in relevant context from manual, using the first reasoning layer to come up with relevant queries and using those to extract relevant text. That relevant text would then be sent to 2nd reasoning layer alongside research text and website text.
-    #OR use website research results to extract most relevant chunks from vector db
-    #OR simply extract relevant chunks based on YMYL, EEAT, Lowest, Low, Medium, High, Fully Meets and use those chunks
-    #However website experience still needs to be judged, a seprate evaluation on the websites design (need image model llm), ads, mobile experience, and content,
-    research_prompt = f'Look into {website} trusworthiness and authority. Then give me a score for their EEAT (Experience,Expertise, Authiritativeness, Trust) as well and indication of whether they are YMYL (Your money your life) from clearly not YMYL, possible YMYL, likely YMYL, to clearly YMYL. Make sure to visit trustpilot as well when determining this.'
+    start_time = time.time()
+    research_prompt = f'Look into {website} trusworthiness and authority. Then give me a score for their EEAT (Experience,Expertise, Authiritativeness, Trust) as well and indication of whether they are YMYL (Your money your life) from clearly not YMYL, possible YMYL, likely YMYL, to clearly YMYL. Make sure to visit trustpilot as well when determining this. Be concise and make it around 5'
     # website_text = scrape_page(website)
     website_research = research_evaluation(research_prompt)
+    page_evaluation = evaluate_page(website)
+    with open('Page Quality Guideline.json','r') as file:
+        relevant_chunks = json.load(file)
+    rating_prompt = f"""I'm going to give you a website alongisde research conducted through searching. Then I will give you a visual evaluation based on screenshots. Then, I will give you relevant information from the US Rater guidelines for additional context.
+         From this you will give me a page quality rating according to US Rater guidelines (From lowest to highest)
+            Website : \n{website}\n
+            Website Research : \n{website_research}\n
+            'Page evaluation' : \n{page_evaluation}\n
+            'US Rater Guidelines' : \n{relevant_chunks}\n
 
-    rating_prompt = f"""I'm going to give you text from a website as well as some research from it. From this you will give me a page quality rating according to US Rater guidelines (From lowest to fully meets)
-            Website : {website}
-            Website Research : {website_research}
+            Finally return in Json format like this:
+            {{
+                'Page Quality Rating' : 'Lowest to Highest'
+            }}
             """
+    print(rating_prompt)
     
     #replace with deepseek R1 when available
     completion = openai_client.chat.completions.create(
         model="gpt-4o",
-        store=True,
+        response_format={ "type": "json_object" },
         messages=[
             {"role": "system", "content": rating_prompt}
-        ]
+        ],
     )
-    return completion.choices[0].message
+    end_time = time.time()
+    print(f"Response completed in {end_time - start_time:.2f} seconds")
+    return completion.choices[0].message.content
 
-print(evaluate_page('https://stackoverflow.com/questions/51046454/how-can-we-use-selenium-webdriver-in-colab-research-google-com'))
+print(page_quality_rating('https://www.couponxoo.com/'))
+# print(evaluate_page('https://www.couponxoo.com/'))
 
 
     
