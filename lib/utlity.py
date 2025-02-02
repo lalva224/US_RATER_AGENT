@@ -16,12 +16,12 @@ from PIL import Image
 from io import BytesIO
 import undetected_chromedriver as uc
 load_dotenv()
-pinecone = Pinecone(api_key= os.getenv('PINECONE_API_KEY'))
+pinecone = Pinecone(api_key= userdata.get('PINECONE_API_KEY')) # type: ignore
 
 
 def scrape_page(website):
     url = f'https://r.jina.ai/{website}'
-    headers = {'Authorization': f"Bearer {os.getenv('JINA_API_KEY')}"}
+    headers = {'Authorization': f"Bearer {userdata.get('JINA_API_KEY')}"} # type: ignore
 
     response = requests.get(url, headers=headers)
 

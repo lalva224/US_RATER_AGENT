@@ -18,8 +18,8 @@ from janus.utils.io import load_pil_images
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+genai.configure(api_key=userdata.get('GOOGLE_API_KEY')) # type: ignore
+client = OpenAI(api_key=userdata.get('OPENAI_API_KEY')) # type: ignore
 
 
 def research_evaluation(query):
