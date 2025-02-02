@@ -107,7 +107,7 @@ def page_quality_rating(website):
     )
     return completion.choices[0].message
 
-# evaluate_page('https://huggingface.co/deepseek-ai/Janus-Pro-7B')
+evaluate_page('https://huggingface.co/deepseek-ai/Janus-Pro-7B')
 
 
     
