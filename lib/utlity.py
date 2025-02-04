@@ -27,17 +27,17 @@ def scrape_page(website):
 
     return response.text
 
-def get_page_quality_relevant_chunks():
+def get_page_quality_relevant_chunks(query,file_name,k):
     index_name = 'summary-bot'
     index = pinecone.Index(index_name)
     namespace = 'US Rater Guidelines.pdf'
-    query = 'E-E-A-T, YMYL, Lowest, Low, Medium, High, Highest, Page Quality'
+    # query = 'E-E-A-T, YMYL, Lowest, Low, Medium, High, Highest, Page Quality'
     embedding_model = AutoModel.from_pretrained('jinaai/jina-embeddings-v2-base-en', trust_remote_code=True)
     embeddings = embedding_model.encode(query).tolist()
 
     results = index.query(
         vector = embeddings,
-        top_k = 10,
+        top_k =k,
         namespace = namespace,
         include_metadata= True
     )
@@ -54,7 +54,7 @@ def get_page_quality_relevant_chunks():
         "query" : query,
         "results" : formatted_results
     }
-    with open('Page Quality Guideline.json','w',encoding='utf-8') as file:
+    with open(file_name,'w',encoding='utf-8') as file:
         json.dump(json_output,file)
 
 def capture_desktop(url):
@@ -160,5 +160,5 @@ def get_screenshots(url):
     encoded_images = [desktop_start,desktop_mid,mobile_start,mobile_mid]
     return encoded_images
 
-
+get_page_quality_relevant_chunks('E-E-A-T, YMYL','Research Evaluation- EEAT and YMYL',5)
 
