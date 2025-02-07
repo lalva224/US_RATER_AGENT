@@ -64,10 +64,9 @@ def capture_desktop(url):
 
 # SSL and Security settings
     chrome_options.add_argument('--headless=new')
-    chrome_options.add_argument('--ignore-certificate-errors')
     chrome_options.add_argument('--ignore-ssl-errors')
-    chrome_options.add_argument('--disable-cookies')
-    chrome_options.add_argument('--disable-notifications')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
 
 # WebGL and graphics settings
     chrome_options.add_argument('--disable-gpu-sandbox')
@@ -105,11 +104,9 @@ def capture_mobile(url):
 
 # SSL and Security settings
     chrome_options.add_argument('--headless=new')
-    chrome_options.add_argument('--ignore-certificate-errors')
     chrome_options.add_argument('--ignore-ssl-errors')
-    chrome_options.add_argument('--disable-cookies')
-    chrome_options.add_argument('--disable-notifications')
-
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
 # WebGL and graphics settings
     chrome_options.add_argument('--disable-gpu-sandbox')
     chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
@@ -160,5 +157,5 @@ def get_screenshots(url):
     encoded_images = [desktop_start,desktop_mid,mobile_start,mobile_mid]
     return encoded_images
 
-get_page_quality_relevant_chunks('E-E-A-T, YMYL','Research Evaluation- EEAT and YMYL',5)
+get_page_quality_relevant_chunks('Fails to meet,Slightly meets,Moderately meets,Highly meets,Fully meets, Query, User Intent','Page Quality Guidelines Needs met',5)
 

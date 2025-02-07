@@ -13,7 +13,12 @@ from lib.utlity import scrape_page,capture_desktop_and_mobile_screenshots
 import torch
 import time
 from groq import Groq
-# from google import genai
+import logging
+from concurrent.futures import ThreadPoolExecutor
+
+
+#level 10 is debugging level 20 in INFO, then warning, error, and critical. It just means this level or higher. Then the formatting
+logging.basicConfig(level=logging.INFO,format="%(asctime)s - %(message)s")
 
 
 load_dotenv()
@@ -26,24 +31,48 @@ client = Groq(
 )
 with open('Page Quality Guideline.json','r') as file:
         page_quality_rating_context = json.load(file)
-with open('Research Evaluation- EEAT and YMYL','r') as file:
-        research_evaluation_context = json.load(file)
+with open('Page Quality Guidelines Needs met.json','r') as file:
+        needs_met_rating_context = json.load(file)
 
 
-#TODO make use of logging 
+def needs_met_evaluation(query_image,query,user_location,user_intent):
+      logging.info('Needs met evaluation started')
+      img = Image.open(query_image)
+      prompt = f"""Evaluate this query result for needs met based on US rater Guidelines.
+        Here is context from the guidelines : {needs_met_rating_context}
+        Here is the query : {query}
+        Here is user location : {user_location}
+        Here is user intent : {user_intent}
+        Query result is also attached.
+
+        you will rate the needs met as either Fails to meet, Fails to meet+, Slightly meets, Slightly meets+, Moderately meets,Moderately meets+,Highly meets,Highly meets+, Fully meets. 
+        The response will be in JSON and look like this:
+        {{
+        "needs met": ""
+        }}
+
+         """
+      print(prompt)
+      model = genai.GenerativeModel(model_name="gemini-1.5-pro")
+      response = model.generate_content([img,prompt])
+      logging.info('needs met evaluation complete')
+      return response.candidates[0].content.parts[0].text
 def research_evaluation(website):
+    logging.info('Starting Research Evaluation')
     research_prompt = f"""Look into {website} trusworthiness and authority. Then give me a score for their EEAT (Experience,Expertise, Authiritativeness, Trust) as well and indication of whether they are YMYL (Your money your life) from clearly not YMYL, possible YMYL, likely YMYL, to clearly YMYL.
       Make sure to visit trustpilot as well when determining this. Be very strict when it comes to trustworthiness. Be concise and give me around 5 sentences.
       """
     model = genai.GenerativeModel('models/gemini-1.5-pro-002')
     response = model.generate_content(contents=research_prompt,
                                 tools='google_search_retrieval')
+    logging.info('Research evaluation complete')
     return response.candidates[0].content.parts[0].text
 
 
 def evaluate_page(website):
     #pass in screenshot on desktop, mobile, then send scraped page
     # scraped_page = scrape_page(website)
+    logging.info('Starting page evaluation')
     mobile_desktop_screenshots = capture_desktop_and_mobile_screenshots(website)
     desktop_start, desktop_mid = mobile_desktop_screenshots['desktop']
     mobile_start, mobile_mid = mobile_desktop_screenshots['mobile']
@@ -54,7 +83,7 @@ def evaluate_page(website):
     model = genai.GenerativeModel(model_name="gemini-1.5-pro")
 
     response = model.generate_content([desktop_start,desktop_mid,mobile_start,mobile_mid,prompt])
-   
+    logging.info('Page evaluation complete')
     return response.candidates[0].content.parts[0].text
 
   
@@ -75,12 +104,12 @@ def page_quality_rating(website):
 
             Finally return in Json format like this:
             {{
-                'Page Quality Rating' : '1-9'
+                "page Quality Rating" : "'
             }}
             """
     print(rating_prompt)
     
-  
+    logging.info('Starting final evaluation')
     response= client.chat.completions.create(
     messages=[
         {
@@ -91,13 +120,25 @@ def page_quality_rating(website):
     model="deepseek-r1-distill-llama-70b",
     response_format={ "type": "json_object" }
 )
-                                   
     end_time = time.time()
-    print(f"Response completed in {end_time - start_time:.2f} seconds")
+    logging.info(f"Response completed in {end_time - start_time:.2f} seconds")
     return response.choices[0].message.content
 
+def get_page_ratings(website,query_image,query,user_location,user_intent):
+    start_time = time.time()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+         page_quality_rating_score = executor.submit(page_quality_rating,website)
+         needs_met_rating_score = executor.submit(needs_met_evaluation,query_image,query,user_location,user_intent)
+        
+         page_quality_rating_results = page_quality_rating_score.result()
+         needs_met_rating_results = needs_met_rating_score.result()
+    
+    end_time = time.time()
+    logging.info(f"Response completed in {end_time - start_time:.2f} seconds")
+    return page_quality_rating_results,needs_met_rating_results
 
-print(page_quality_rating('https://www.bostons.com/'))
+print(page_quality_rating('https://www.classicfm.com/discover-music/instruments/piano/why-pianos-have-88-keys/'))
+# print(get_page_ratings('https://www.classicfm.com/discover-music/instruments/piano/why-pianos-have-88-keys/','Needs_Met_Query_1.png','how many octaves in a guitar','Cleveland, Ohio','Find out the number of octaves in a guitar'))
 
 
     
