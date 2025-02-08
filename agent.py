@@ -1,4 +1,3 @@
-import google.generativeai as genai
 import os 
 import requests
 from dotenv import load_dotenv
@@ -15,6 +14,9 @@ import time
 from groq import Groq
 import logging
 from concurrent.futures import ThreadPoolExecutor
+import asyncio
+from google import genai
+from google.genai import types
 
 
 #level 10 is debugging level 20 in INFO, then warning, error, and critical. It just means this level or higher. Then the formatting
@@ -23,9 +25,9 @@ logging.basicConfig(level=logging.INFO,format="%(asctime)s - %(message)s")
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv('GOOGLE_API_KEY')) # type: ignore
+# genai.configure(api_key=os.getenv('GOOGLE_API_KEY'))
+google_client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
 # genai_client = genai.Client(api_key=os.getenv('GOOGLE_API_KEY'))
-openai_client= OpenAI(api_key=os.getenv('OPENAI_API_KEY')) # type: ignore
 client = Groq(
     api_key=os.getenv("GROQ_API_KEY")
 )
@@ -53,8 +55,9 @@ def needs_met_evaluation(query_image,query,user_location,user_intent):
 
          """
       print(prompt)
-      model = genai.GenerativeModel(model_name="gemini-1.5-pro")
-      response = model.generate_content([img,prompt])
+    #   model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite-preview-02-05")
+    #   response = model.generate_content([img,prompt])
+      response = google_client.models.generate_content(model='gemini-2.0-flash-lite-preview-02-05',contents=prompt)
       logging.info('needs met evaluation complete')
       return response.candidates[0].content.parts[0].text
 def research_evaluation(website):
@@ -62,27 +65,35 @@ def research_evaluation(website):
     research_prompt = f"""Look into {website} trusworthiness and authority. Then give me a score for their EEAT (Experience,Expertise, Authiritativeness, Trust) as well and indication of whether they are YMYL (Your money your life) from clearly not YMYL, possible YMYL, likely YMYL, to clearly YMYL.
       Make sure to visit trustpilot as well when determining this. Be very strict when it comes to trustworthiness. Be concise and give me around 5 sentences.
       """
-    model = genai.GenerativeModel('models/gemini-1.5-pro-002')
-    response = model.generate_content(contents=research_prompt,
-                                tools='google_search_retrieval')
+    #flash lite does not flave searching available
+    response = google_client.models.generate_content(
+    model='gemini-2.0-flash',
+    contents=research_prompt,
+    config=types.GenerateContentConfig(
+        tools=[types.Tool(
+            google_search=types.GoogleSearchRetrieval
+        )]
+    )
+)
     logging.info('Research evaluation complete')
     return response.candidates[0].content.parts[0].text
 
 
-def evaluate_page(website):
+async def evaluate_page(website):
     #pass in screenshot on desktop, mobile, then send scraped page
     # scraped_page = scrape_page(website)
     logging.info('Starting page evaluation')
-    mobile_desktop_screenshots = capture_desktop_and_mobile_screenshots(website)
+    mobile_desktop_screenshots = asyncio.run(capture_desktop_and_mobile_screenshots(website))
     desktop_start, desktop_mid = mobile_desktop_screenshots['desktop']
     mobile_start, mobile_mid = mobile_desktop_screenshots['mobile']
 
     prompt = f""""Evaluate these website screenshots and describe the user experience, design quality, and content organization. 
     For the mobile screenshots note if the scaling or designing is off. ignore any cookie banners. Be concise and give me around 5 sentences
     """
-    model = genai.GenerativeModel(model_name="gemini-1.5-pro")
+    # model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite-preview-02-05")
+    # response = model.generate_content([desktop_start,desktop_mid,mobile_start,mobile_mid,prompt])
 
-    response = model.generate_content([desktop_start,desktop_mid,mobile_start,mobile_mid,prompt])
+    response = google_client.models.generate_content(model='gemini-2.0-flash-lite-preview-02-05',contents=prompt)
     logging.info('Page evaluation complete')
     return response.candidates[0].content.parts[0].text
 
@@ -137,9 +148,8 @@ def get_page_ratings(website,query_image,query,user_location,user_intent):
     logging.info(f"Response completed in {end_time - start_time:.2f} seconds")
     return page_quality_rating_results,needs_met_rating_results
 
-print(page_quality_rating('https://www.classicfm.com/discover-music/instruments/piano/why-pianos-have-88-keys/'))
-# print(get_page_ratings('https://www.classicfm.com/discover-music/instruments/piano/why-pianos-have-88-keys/','Needs_Met_Query_1.png','how many octaves in a guitar','Cleveland, Ohio','Find out the number of octaves in a guitar'))
-
+# print(page_quality_rating('https://www.classicfm.com/discover-music/instruments/piano/why-pianos-have-88-keys/'))
+print(get_page_ratings('https://www.classicfm.com/discover-music/instruments/piano/why-pianos-have-88-keys/','Needs_Met_Query_1.png','how many octaves in a guitar','Cleveland, Ohio','Find out the number of octaves in a guitar'))
 
     
         

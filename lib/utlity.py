@@ -15,6 +15,9 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image 
 from io import BytesIO
+from playwright.async_api import async_playwright
+import asyncio
+
 load_dotenv()
 pinecone = Pinecone(api_key= os.getenv('PINECONE_API_KEY')) 
 
@@ -57,90 +60,65 @@ def get_page_quality_relevant_chunks(query,file_name,k):
     with open(file_name,'w',encoding='utf-8') as file:
         json.dump(json_output,file)
 
-def capture_desktop(url):
+async def capture_desktop(url):
    #first capture screenshots and make sure selenium is doing job correctly on headless mode.
    # Then convert to PIL image and use that to send to LLM.
-    chrome_options = Options()
 
-# SSL and Security settings
-    chrome_options.add_argument('--headless=new')
-    chrome_options.add_argument('--ignore-ssl-errors')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
+   async with async_playwright() as p:
+    browser = await p.chromium.launch(headless=True)
+    page = await browser.new_page()
+    await page.goto(url)
+    #waits for page to load and dynamic content
+    await page.wait_for_load_state('networkidle') 
 
-# WebGL and graphics settings
-    chrome_options.add_argument('--disable-gpu-sandbox')
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get(url)
-
-    #dynamically waits for page to load
-    WebDriverWait(driver, 20).until(
-                lambda d: d.execute_script("return document.readyState") == "complete"
-            )
-    #creates bytes object 
-    screenshot_1 = driver.get_screenshot_as_png()
-    #BytesIO creates a virtual memory buffer to store the bytes, from there they are converted to a PIL object.
-    # desktop_start = base64.b64encode(screenshot_1).decode('utf-8')
+    screenshot_1 = await page.screenshot()
     desktop_start = Image.open(BytesIO(screenshot_1))
     #scroll halfway for another screenshot
-    total_height = driver.execute_script("return document.body.scrollHeight")
+    total_height =  await page.evaluate("document.body.scrollHeight")
     middle_height = total_height // 2
-    driver.execute_script(f"window.scrollTo(0, {middle_height});")
-    time.sleep(2)  # Allow time for any dynamic content to load
+    await page.evaluate(f"window.scrollTo(0, {middle_height});")
+    await page.wait_for_timeout(2000) # Allow time for any dynamic content to load
     
-    screenshot_2 = driver.get_screenshot_as_png()
+    screenshot_2 = await page.screenshot()
     # desktop_mid = base64.b64encode(screenshot_2).decode('utf-8')
     desktop_mid = Image.open(BytesIO(screenshot_2))
-    driver.quit()
+    await browser.close()
 
     return desktop_start,desktop_mid
 
-def capture_mobile(url):
-    mobile_emulation = {
-    "deviceMetrics": { "width": 360, "height": 640, "pixelRatio": 3.0 },
-    "userAgent": "Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36"
-}
-    chrome_options = Options()
+async def capture_mobile(url):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        context = await browser.new_context(
+            viewport={'width': 360, 'height': 640},
+            user_agent='Mozilla/5.0 (Linux; Android 10; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.162 Mobile Safari/537.36'
+        )
+        page = await context.new_page()
+        await page.goto(url)
+        await page.wait_for_load_state('networkidle')
 
-# SSL and Security settings
-    chrome_options.add_argument('--headless=new')
-    chrome_options.add_argument('--ignore-ssl-errors')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-# WebGL and graphics settings
-    chrome_options.add_argument('--disable-gpu-sandbox')
-    chrome_options.add_experimental_option("mobileEmulation", mobile_emulation)
-    driver = webdriver.Chrome(options=chrome_options)
-    driver.get(url)
-    WebDriverWait(driver, 20).until(
-                lambda d: d.execute_script("return document.readyState") == "complete"
-            )
-    screenshot_1 = driver.get_screenshot_as_png()
-    #convert to  base 64 string
-    # mobile_start =base64.b64encode(screenshot_1).decode('utf-8')
+        screenshot_1 = await page.screenshot()
+        #convert to  base 64 string
+        # mobile_start =base64.b64encode(screenshot_1).decode('utf-8')
 
-    mobile_start = Image.open(BytesIO(screenshot_1))
-    #scroll halfway for another screenshot
-    total_height = driver.execute_script("return document.body.scrollHeight")
-    middle_height = total_height // 2
-    driver.execute_script(f"window.scrollTo(0, {middle_height});")
-    time.sleep(2)  # Allow time for any dynamic content to load
+        mobile_start = Image.open(BytesIO(screenshot_1))
+        #scroll halfway for another screenshot
+        total_height = await page.evaluate("document.body.scrollHeight")
+        middle_height = total_height // 2
+        await page.evaluate(f"window.scrollTo(0, {middle_height});")
+        await page.wait_for_timeout(2000)  # Allow time for any dynamic content to load
 
-    screenshot_2 = driver.get_screenshot_as_png()
-    # mobile_end = base64.b64encode(screenshot_2).decode('utf-8')
-    mobile_end = Image.open(BytesIO(screenshot_2))
-    driver.quit()
+        screenshot_2 = await page.screenshot()
+        # mobile_end = base64.b64encode(screenshot_2).decode('utf-8')
+        mobile_end = Image.open(BytesIO(screenshot_2))
+        await browser.close()
 
-    return mobile_start, mobile_end
-def capture_desktop_and_mobile_screenshots(url):
+        return mobile_start, mobile_end
+async def capture_desktop_and_mobile_screenshots(url):
     #uses multithreading to save time
     start_time = time.time()
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        desktop_future = executor.submit(capture_desktop,url)
-        mobile_future = executor.submit(capture_mobile,url)
-
-        desktop_images = desktop_future.result()
-        mobile_images = mobile_future.result()
+    #using asyncio to do multithreading
+    desktop_images, mobile_images = await asyncio.gather(capture_desktop(url),capture_mobile(url))
 
 
     end_time = time.time()
@@ -157,5 +135,7 @@ def get_screenshots(url):
     encoded_images = [desktop_start,desktop_mid,mobile_start,mobile_mid]
     return encoded_images
 
-get_page_quality_relevant_chunks('Fails to meet,Slightly meets,Moderately meets,Highly meets,Fully meets, Query, User Intent','Page Quality Guidelines Needs met',5)
+# get_page_quality_relevant_chunks('Fails to meet,Slightly meets,Moderately meets,Highly meets,Fully meets, Query, User Intent','Page Quality Guidelines Needs met',5)
+
+
 
