@@ -56,10 +56,8 @@ def needs_met_evaluation(scraped_page,query_image,query,user_location,user_inten
         }}
 
          """
-      print(prompt)
-    #   model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite-preview-02-05")
-    #   response = model.generate_content([img,prompt])
-      response = google_client.models.generate_content(model='gemini-2.0-flash-lite-preview-02-05',contents=[prompt,query_image])
+      
+      response = google_client.models.generate_content(model='gemini-2.0-flash-lite-preview-02-05',contents=[prompt,img])
       logging.info('needs met evaluation complete')
       return response.candidates[0].content.parts[0].text
 def research_evaluation(website):
@@ -106,7 +104,7 @@ async def evaluate_page(website):
 
   
 
-def page_quality_rating(website):
+def page_quality_rating(scraped_page,website):
     start_time = time.time()
     # website_text = scrape_page(website)
     website_research = research_evaluation(website)
@@ -118,7 +116,9 @@ def page_quality_rating(website):
             Website : \n{website}\n
             Website Research : \n{website_research}\n
             'Page evaluation' : \n{page_evaluation}\n
+            'Here is the page content': \n {scraped_page}\n
             'US Rater Guidelines' : \n{page_quality_rating_context}\n
+
 
             Finally return in Json format like this:
             {{
@@ -144,11 +144,12 @@ def page_quality_rating(website):
 
 def get_page_ratings(website,query_image,query,user_location,user_intent):
     start_time = time.time()
+    scraped_page = scrape_page(website)
     with ThreadPoolExecutor(max_workers=2) as executor:
-         page_quality_rating_score = executor.submit(page_quality_rating,website)
+         page_quality_rating_score = executor.submit(page_quality_rating,website,scraped_page)
          page_quality_rating_results = page_quality_rating_score.result()
 
-         needs_met_rating_score = executor.submit(needs_met_evaluation,page_quality_rating_results,query_image,query,user_location,user_intent)
+         needs_met_rating_score = executor.submit(needs_met_evaluation,scraped_page,query_image,query,user_location,user_intent)
          needs_met_rating_results = needs_met_rating_score.result()
     
     end_time = time.time()
@@ -156,21 +157,14 @@ def get_page_ratings(website,query_image,query,user_location,user_intent):
     return page_quality_rating_results,needs_met_rating_results
 
 
+url = 'https://www.nasa.gov/johnson/'
+query_image = 'needs_met_rating_2.PNG'
+query = 'nasa space center fl'
+user_location = 'Not specified'
+user_intent = 'Not specified'
 
-async def main():
-    url = 'https://www.nasa.gov/johnson/'
-    query_image = 'needs_met_rating_2.PNG'
-    query = 'nasa space center fl'
-    user_location = 'Not specified'
-    user_intent = 'Not specified'
-    scraped_page = await scrape_page(url)
-    print(needs_met_evaluation(scraped_page,query_image,query,user_location,user_intent))
-
-if __name__ =='__main__':
-     asyncio.run(main())
-
-# print(get_page_ratings(url,query_image, query,user_location,user_intent))
-
+print(get_page_ratings(url,query_image, query,user_location,user_intent))
+# print(needs_met_evaluation(url,query_image,query,user_location,user_intent))
     
         
             
