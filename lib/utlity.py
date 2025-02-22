@@ -22,13 +22,15 @@ load_dotenv()
 pinecone = Pinecone(api_key= os.getenv('PINECONE_API_KEY')) 
 
 
-def scrape_page(website):
-    url = f'https://r.jina.ai/{website}'
-    headers = {'Authorization': f"Bearer {os.getenv('JINA_API_KEY')}"} 
+async def scrape_page(website):
+    async with async_playwright() as p:
+        browser = await p.chromium.launch()
+        page = await browser.new_page()
+        await page.goto(website)
+        content =await page.inner_text('body')
+        browser.close()
 
-    response = requests.get(url, headers=headers)
-
-    return response.text
+        return content
 
 def get_page_quality_relevant_chunks(query,file_name,k):
     index_name = 'summary-bot'
@@ -135,6 +137,7 @@ def get_screenshots(url):
     encoded_images = [desktop_start,desktop_mid,mobile_start,mobile_mid]
     return encoded_images
 
+print(asyncio.run(scrape_page('https://leandroalvarez.com/')))
 # get_page_quality_relevant_chunks('Fails to meet,Slightly meets,Moderately meets,Highly meets,Fully meets, Query, User Intent','Page Quality Guidelines Needs met',5)
 
 

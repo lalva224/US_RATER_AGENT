@@ -37,15 +37,17 @@ with open('Page Quality Guidelines Needs met.json','r') as file:
         needs_met_rating_context = json.load(file)
 
 
-def needs_met_evaluation(query_image,query,user_location,user_intent):
+def needs_met_evaluation(scraped_page,query_image,query,user_location,user_intent):
       logging.info('Needs met evaluation started')
       img = Image.open(query_image)
-      prompt = f"""Evaluate this query result for needs met based on US rater Guidelines.
+      prompt = f"""Evaluate this  for needs met based on US rater Guidelines.
         Here is context from the guidelines : {needs_met_rating_context}
+        It's worth noting that if this is a Special Content Result Block, you must only base your result on both the snippet and landing page evaluation.
+        if this is a web search result block then only base result on the landing page evaluation.
+        Here is scraped website : {scraped_page}
         Here is the query : {query}
         Here is user location : {user_location}
         Here is user intent : {user_intent}
-        Query result is also attached.
 
         you will rate the needs met as either Fails to meet, Fails to meet+, Slightly meets, Slightly meets+, Moderately meets,Moderately meets+,Highly meets,Highly meets+, Fully meets. 
         The response will be in JSON and look like this:
@@ -57,7 +59,7 @@ def needs_met_evaluation(query_image,query,user_location,user_intent):
       print(prompt)
     #   model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite-preview-02-05")
     #   response = model.generate_content([img,prompt])
-      response = google_client.models.generate_content(model='gemini-2.0-flash-lite-preview-02-05',contents=prompt)
+      response = google_client.models.generate_content(model='gemini-2.0-flash-lite-preview-02-05',contents=[prompt,query_image])
       logging.info('needs met evaluation complete')
       return response.candidates[0].content.parts[0].text
 def research_evaluation(website):
@@ -81,20 +83,25 @@ def research_evaluation(website):
 
 async def evaluate_page(website):
     #pass in screenshot on desktop, mobile, then send scraped page
-    # scraped_page = scrape_page(website)
     logging.info('Starting page evaluation')
-    mobile_desktop_screenshots = asyncio.run(capture_desktop_and_mobile_screenshots(website))
+    mobile_desktop_screenshots = await capture_desktop_and_mobile_screenshots(website)
     desktop_start, desktop_mid = mobile_desktop_screenshots['desktop']
     mobile_start, mobile_mid = mobile_desktop_screenshots['mobile']
 
+    scraped_page = scrape_page(website)
     prompt = f""""Evaluate these website screenshots and describe the user experience, design quality, and content organization. 
-    For the mobile screenshots note if the scaling or designing is off. ignore any cookie banners. Be concise and give me around 5 sentences
+    For the mobile screenshots note if the scaling or designing is off. It is important to ignore any cookie banners. Be concise and give me around 5 sentences
+
+    Here is the text from the website, note anything important : {scraped_page}
+
+
     """
     # model = genai.GenerativeModel(model_name="gemini-2.0-flash-lite-preview-02-05")
     # response = model.generate_content([desktop_start,desktop_mid,mobile_start,mobile_mid,prompt])
 
-    response = google_client.models.generate_content(model='gemini-2.0-flash-lite-preview-02-05',contents=prompt)
+    response = google_client.models.generate_content(model='gemini-2.0-flash-lite-preview-02-05',contents=[desktop_start,desktop_mid,mobile_start,mobile_mid,prompt])
     logging.info('Page evaluation complete')
+    print(response.candidates[0].content.parts[0].text)
     return response.candidates[0].content.parts[0].text
 
   
@@ -115,7 +122,7 @@ def page_quality_rating(website):
 
             Finally return in Json format like this:
             {{
-                "page Quality Rating" : "'
+                "Page Quality Rating" : "'
             }}
             """
     print(rating_prompt)
@@ -139,17 +146,30 @@ def get_page_ratings(website,query_image,query,user_location,user_intent):
     start_time = time.time()
     with ThreadPoolExecutor(max_workers=2) as executor:
          page_quality_rating_score = executor.submit(page_quality_rating,website)
-         needs_met_rating_score = executor.submit(needs_met_evaluation,query_image,query,user_location,user_intent)
-        
          page_quality_rating_results = page_quality_rating_score.result()
+
+         needs_met_rating_score = executor.submit(needs_met_evaluation,page_quality_rating_results,query_image,query,user_location,user_intent)
          needs_met_rating_results = needs_met_rating_score.result()
     
     end_time = time.time()
     logging.info(f"Response completed in {end_time - start_time:.2f} seconds")
     return page_quality_rating_results,needs_met_rating_results
 
-# print(page_quality_rating('https://www.classicfm.com/discover-music/instruments/piano/why-pianos-have-88-keys/'))
-print(get_page_ratings('https://www.classicfm.com/discover-music/instruments/piano/why-pianos-have-88-keys/','Needs_Met_Query_1.png','how many octaves in a guitar','Cleveland, Ohio','Find out the number of octaves in a guitar'))
+
+
+async def main():
+    url = 'https://www.nasa.gov/johnson/'
+    query_image = 'needs_met_rating_2.PNG'
+    query = 'nasa space center fl'
+    user_location = 'Not specified'
+    user_intent = 'Not specified'
+    scraped_page = await scrape_page(url)
+    print(needs_met_evaluation(scraped_page,query_image,query,user_location,user_intent))
+
+if __name__ =='__main__':
+     asyncio.run(main())
+
+# print(get_page_ratings(url,query_image, query,user_location,user_intent))
 
     
         
