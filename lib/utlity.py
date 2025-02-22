@@ -15,8 +15,8 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image 
 from io import BytesIO
-# from playwright.async_api import async_playwright
-from undetected_playwright.async_api import async_playwright, Playwright
+from playwright.async_api import async_playwright
+# from undetected_playwright.async_api import async_playwright, Playwright
 
 import asyncio
 
@@ -25,16 +25,10 @@ pinecone = Pinecone(api_key= os.getenv('PINECONE_API_KEY'))
 
 
 async def scrape_page(website):
-    async with async_playwright() as p:
-        args = ["--disable-blink-features=AutomationControlled"]
-        browser = await p.chromium.launch(headless=True,args=args)
-        page = await browser.new_page()
+    url = f'https://r.jina.ai/{website}'
+    headers = {'Authorization': f"Bearer {os.getenv('JINA_API_KEY')}"} 
 
-        await page.goto(website, wait_until="networkidle",timeout=30000)
-        content = await page.inner_text('body')
-        await browser.close()
-
-        return content
+    response = requests.get(url, headers=headers)
 
 def get_page_quality_relevant_chunks(query,file_name,k):
     index_name = 'summary-bot'
@@ -75,7 +69,7 @@ async def capture_desktop(url):
     page = await browser.new_page()
     await page.goto(url)
     #waits for page to load and dynamic content
-    await page.wait_for_load_state('networkidle') 
+    await page.wait_for_load_state('domcontentloaded') 
 
     screenshot_1 = await page.screenshot()
     desktop_start = Image.open(BytesIO(screenshot_1))
@@ -101,7 +95,7 @@ async def capture_mobile(url):
         )
         page = await context.new_page()
         await page.goto(url)
-        await page.wait_for_load_state('networkidle')
+        await page.wait_for_load_state('domcontentloaded')
 
         screenshot_1 = await page.screenshot()
         #convert to  base 64 string
