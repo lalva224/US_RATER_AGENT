@@ -15,7 +15,9 @@ import base64
 from concurrent.futures import ThreadPoolExecutor
 from PIL import Image 
 from io import BytesIO
-from playwright.async_api import async_playwright
+# from playwright.async_api import async_playwright
+from undetected_playwright.async_api import async_playwright, Playwright
+
 import asyncio
 
 load_dotenv()
@@ -24,11 +26,13 @@ pinecone = Pinecone(api_key= os.getenv('PINECONE_API_KEY'))
 
 async def scrape_page(website):
     async with async_playwright() as p:
-        browser = await p.chromium.launch()
+        args = ["--disable-blink-features=AutomationControlled"]
+        browser = await p.chromium.launch(headless=True,args=args)
         page = await browser.new_page()
-        await page.goto(website)
-        content =await page.inner_text('body')
-        browser.close()
+
+        await page.goto(website, wait_until="networkidle",timeout=30000)
+        content = await page.inner_text('body')
+        await browser.close()
 
         return content
 
@@ -138,6 +142,7 @@ def get_screenshots(url):
     return encoded_images
 
 # get_page_quality_relevant_chunks('Fails to meet,Slightly meets,Moderately meets,Highly meets,Fully meets, Query, User Intent','Page Quality Guidelines Needs met',5)
+
 
 
 
